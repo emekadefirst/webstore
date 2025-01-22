@@ -1,3 +1,5 @@
+import random
+import string
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -64,4 +66,35 @@ class Cart(models.Model):
         return self.user.username
 
 
-class Order()
+class Order(models.Model):
+    id = models.AutoField(primary_key=True)
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
+    code = models.CharField(max_length=10)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self._generate_unique_code()
+        super().save(*args, **kwargs)
+
+    def _generate_unique_code(self):
+        """Generate a unique 10-character alphanumeric code."""
+        while True:
+            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+            if not Order.objects.filter(code=code).exists():
+                return code
+
+
+class Payment(models.Model):
+    id = models.AutoField(primary_key=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    reference_id = models.CharField(max_length=12, unique=True)
+    status = models.CharField(max_length=20, default="processing")
+    time = models.DateTimeField(auto_now_add=True)
+    
+    def save(self, *args, **kwargs):
+        if self.order:
+            self.amount = self.order.cart.total_cost
+            self.user = self.order.cart.user
+        super().save(*args, **kwargs)
